@@ -1,0 +1,108 @@
+#!/bin/bash
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+CYAN='\033[1;36m'
+WHITE='\033[1m'
+RESET='\033[0m'
+
+hostsReader() {
+    local config_file="$1"
+    if [[ ! -f "$config_file" || ! -r "$config_file" ]]; then
+        echo -e "${RED}Error: Configuration file '$config_file' does not exist or is not readable.${RESET}"
+        exit 1
+    fi
+    while IFS= read -r line; do
+        [[ -z "$line" || "$line" =~ ^# ]] && continue
+        hosts+=("$line")
+    done < "$config_file"
+}
+
+prettierLine() {
+    for (( i=0; i<25; i++ )); do
+        echo -n "-"
+    done
+    echo ""
+}
+
+separator_with_title() {
+    local label=$1
+    local color=$2
+    local width=$(( $(tput cols) - ${#label} - 1 ))
+    printf "\e[3;${color}m%s\e[0m %*s\n" "$label" $width | tr ' ' '-'
+}
+
+pretty_desh() {
+    local count=$2
+    local desh="-"
+    char=$(printf "%${count}s" | tr ' ' $desh)
+
+    for ((i=0; i<$1; i++))
+    do
+        if [ $i -ge 1 ]
+        then
+            printf "${WHITE}-${char}-+------------------+${RESET}"
+        else
+            printf  "\t${WHITE}+-${char}-+------------------+${RESET}"
+        fi
+    done
+    printf "\n"
+}
+
+table_builder() {
+    local path=$1
+
+    ip_list=($(cat $path))
+    total_ips=${#ip_list[@]}
+    rows_per_column=$2
+    columns=$(((total_ips + rows_per_column - 1) / rows_per_column ))
+    number=$(((total_ips + 9) / 10 * 10))
+    length=${#number}
+
+    pretty_desh $columns $length
+
+    for ((i=0; i<rows_per_column; i++))
+    do
+        for ((j=0; j<columns; j++))
+        do
+            index=$((i + j * rows_per_column))
+            if [ $index -ge $2 ]
+            then
+                ip=${ip_list[$index]}
+                printf " ${YELLOW}%-2d${RESET} ${WHITE}|${RESET} ${YELLOW}%-16s${RESET} ${WHITE}|${RESET}"  $((index+1)) $ip
+            elif [ $index -lt $total_ips ]
+            then
+                ip=${ip_list[$index]}
+                printf "\t${WHITE}|${RESET} ${YELLOW}%-2d${RESET} ${WHITE}|${RESET} ${YELLOW}%-16s${RESET} ${WHITE}|${RESET}"  $((index+1)) $ip
+            else
+                printf "${WHITE}|${RESET}    ${WHITE}|${RESET}                  ${WHITE}|${RESET}"
+            fi
+        done
+        printf "\n"
+    done
+
+    pretty_desh $columns $length
+}
+
+hostsReader "/opt/auto_ssh/hosts.conf"
+
+figlet "Auto SSH"
+
+echo
+separator_with_title "SelectHostServer" 36
+echo
+
+table_builder "/opt/auto_ssh/hosts.conf" 5
+
+echo
+read -p "$(echo -e "${CYAN}Enter the host number: ${RESET}")" selection
+prettierLine
+
+if [[ $selection =~ ^[0-9]+$ ]] && (( selection > 0 )) && (( selection <= ${#hosts[@]} )); then
+    selected_host=${hosts[$((selection-1))]}
+    echo -e "${GREEN}Connecting to $selected_host...${RESET}"
+    ssh root@$selected_host
+else
+    echo -e "${RED}Invalid selection. Please enter a valid host number.${RESET}"
+fi
