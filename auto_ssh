@@ -96,13 +96,15 @@ echo
 table_builder "/opt/auto_ssh/hosts.conf" 5
 
 echo
-read -p "$(echo -e "${CYAN}Enter the host number: ${RESET}")" selection
+read -p "$(echo -e "${CYAN}Select the host number from the list above: ${RESET}")" selection
+read -p "$(echo -e "${CYAN}Enter users [default: root] : ${RESET}")" user
 prettierLine
 
 if [[ $selection =~ ^[0-9]+$ ]] && (( selection > 0 )) && (( selection <= ${#hosts[@]} )); then
+    user="${user:-root}"
     selected_host=${hosts[$((selection-1))]}
     echo -e "${GREEN}Connecting to $selected_host...${RESET}"
-    ssh root@$selected_host
+    ssh $user@$selected_host
 else
     echo -e "${RED}Invalid selection. Please enter a valid host number.${RESET}"
 fi
